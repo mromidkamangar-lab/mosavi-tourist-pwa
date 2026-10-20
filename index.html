@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>موسوی توریست</title>
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="موسوی توریست">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<style>
+  html,body{margin:0;height:100%;background:#000;color:#fff;font-family:Vazirmatn,Tahoma,sans-serif;overflow:hidden}
+  iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#000}
+  #splash{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#000;z-index:2;transition:opacity .4s}
+  #splash img{width:96px;height:96px;border-radius:22px}
+  #splash.hide{opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="splash"><img src="icon-192.png" alt=""><div>موسوی توریست</div></div>
+<iframe id="app" title="موسوی توریست" allow="clipboard-write; web-share"></iframe>
+<script>
+(function () {
+  var EXEC = 'https://script.google.com/macros/s/AKfycby8GG75oPVuL9uzE1Vh5E11hlwpMfXS8ls6x-l2ZfyPbzAHvOyc0ak9CQLY7OT8u6Vb/exec';
+  var KEY = 'mt_token';
+  var deferred = null;
+  var standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  var frame = document.getElementById('app');
+  frame.src = EXEC;
+  frame.addEventListener('load', function () { setTimeout(function () { document.getElementById('splash').classList.add('hide'); }, 300); });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+
+  function send(msg) { msg.mt = 1; try { frame.contentWindow.postMessage(msg, '*'); } catch (e) {} }
+  // The Apps Script UI lives in a nested iframe (script.google.com > *.googleusercontent.com); reply to the event source.
+  function reply(ev, msg) { msg.mt = 1; try { ev.source.postMessage(msg, '*'); } catch (e) {} }
+  var lastSrc = null;
+
+  window.addEventListener('beforeinstallprompt', function (e) {
+    e.preventDefault(); deferred = e;
+    if (lastSrc) try { lastSrc.postMessage({ mt: 1, type: 'mt-can-prompt', value: true }, '*'); } catch (x) {}
+    if (/[?&]install=1/.test(location.search)) showBanner();
+  });
+  window.addEventListener('appinstalled', function () {
+    deferred = null;
+    if (lastSrc) try { lastSrc.postMessage({ mt: 1, type: 'mt-installed' }, '*'); } catch (x) {}
+  });
+
+  function showBanner() {
+    if (document.getElementById('instBar') || !deferred) return;
+    var b = document.createElement('button');
+    b.id = 'instBar'; b.textContent = '📲 نصب برنامه روی گوشی';
+    b.style.cssText = 'position:fixed;z-index:9;left:50%;bottom:24px;transform:translateX(-50%);padding:14px 22px;border-radius:14px;border:1px solid #fff;background:#000;color:#fff;font:inherit;font-size:16px';
+    b.onclick = function () { prompt(); b.remove(); };
+    document.body.appendChild(b);
+  }
+  function prompt() { if (!deferred) return; deferred.prompt(); deferred.userChoice.finally(function () { deferred = null; }); }
+
+  window.addEventListener('message', function (ev) {
+    var d = ev.data || {};
+    if (d.mt !== 1) return;
+    if (!/\.googleusercontent\.com$/.test(new URL(ev.origin).hostname)) return;
+    lastSrc = ev.source;
+    if (d.type === 'mt-hello') {
+      var t = ''; try { t = localStorage.getItem(KEY) || ''; } catch (e) {}
+      reply(ev, { type: 'mt-hello-ack', token: t, canPrompt: !!deferred, standalone: standalone });
+    } else if (d.type === 'mt-token-set' && /^[a-f0-9]{40,}$/.test(d.token || '')) {
+      try { localStorage.setItem(KEY, d.token); } catch (e) {}
+    } else if (d.type === 'mt-token-clear') {
+      try { localStorage.removeItem(KEY); } catch (e) {}
+    } else if (d.type === 'mt-install') {
+      if (deferred) prompt(); else showBanner();
+    }
+  });
+})();
+</script>
+</body>
+</html>
